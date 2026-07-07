@@ -45,7 +45,11 @@
         </option>
         {% endfor %}
       </select>
-      <div class="form-hint">Only one model can be loaded at a time. Models not yet downloaded will be fetched automatically.</div>
+      <div class="form-hint" style="margin-bottom: var(--space-sm);">Only one model can be loaded at a time. Models not yet downloaded will be fetched automatically.</div>
+      
+      <label class="form-label mt-sm">Or Custom Hugging Face Model ID</label>
+      <input type="text" class="form-input" id="custom-model-id" placeholder="e.g., mistralai/Mistral-7B-Instruct-v0.1">
+      <div class="form-hint">If provided, this overrides the selection above. It will be downloaded automatically.</div>
     </div>
 
     <div class="form-group">

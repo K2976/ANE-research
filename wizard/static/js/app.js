@@ -19,7 +19,7 @@ const PREFS_KEY = 'ane_wizard_prefs';
 
 function savePrefs() {
   const prefs = {
-    model_id: document.getElementById('model-select')?.value || '',
+    model_id: document.getElementById('custom-model-id')?.value || document.getElementById('model-select')?.value || '',
     prompt_source: document.getElementById('prompt-source')?.value || '',
     eval_mode: document.getElementById('eval-mode')?.value || '',
     metric_profile: document.getElementById('metric-profile')?.value || '',
@@ -42,7 +42,14 @@ function applyPrefs() {
                                        key === 'eval_mode' ? 'eval-mode' :
                                        key === 'metric_profile' ? 'metric-profile' :
                                        key === 'compression' ? 'compression' : '');
-    if (el && val) el.value = val;
+    if (el && val) {
+      if (key === 'model_id' && ![...el.options].some(o => o.value === val)) {
+        const customEl = document.getElementById('custom-model-id');
+        if (customEl) customEl.value = val;
+      } else {
+        el.value = val;
+      }
+    }
   }
 }
 
@@ -261,8 +268,9 @@ function prevStep() { goToStep(APP.currentStep - 1); }
 function validateStep(step) {
   switch (step) {
     case 1: {
-      const model = document.getElementById('model-select')?.value;
-      if (!model) { showToast('Please select a model', 'warning'); return false; }
+      const customModel = document.getElementById('custom-model-id')?.value?.trim();
+      const model = customModel || document.getElementById('model-select')?.value;
+      if (!model) { showToast('Please select or enter a model ID', 'warning'); return false; }
       return true;
     }
     case 2: {
@@ -284,8 +292,9 @@ function populateReview() {
     if (el) el.textContent = val || '—';
   };
 
+  const customModel = document.getElementById('custom-model-id')?.value?.trim();
   const modelSelect = document.getElementById('model-select');
-  const modelText = modelSelect?.options[modelSelect.selectedIndex]?.text || modelSelect?.value || '—';
+  const modelText = customModel || modelSelect?.options[modelSelect.selectedIndex]?.text || modelSelect?.value || '—';
 
   setReview('review-model', modelText);
   setReview('review-compression', document.getElementById('compression')?.value || 'int8');
@@ -298,7 +307,7 @@ function populateReview() {
   setReview('review-device', 'Apple Neural Engine (ANE)');
 
   // Estimate memory
-  const modelId = document.getElementById('model-select')?.value;
+  const modelId = customModel || document.getElementById('model-select')?.value;
   const compress = document.getElementById('compression')?.value || 'int8';
   const memEl = document.getElementById('review-memory');
   if (memEl && modelId) {
@@ -313,8 +322,9 @@ function populateReview() {
 function startExperiment() {
   if (APP.experimentRunning) return;
 
+  const customModel = document.getElementById('custom-model-id')?.value?.trim();
   const config = {
-    model_id: document.getElementById('model-select')?.value,
+    model_id: customModel || document.getElementById('model-select')?.value,
     compression: document.getElementById('compression')?.value || 'int8',
     prompt_source: document.getElementById('prompt-source')?.value || 'single',
     prompt_text: document.getElementById('prompt-text')?.value || '',
