@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Compare Experiments — ANE Wizard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>Compare Experiments</h2>
+  <p>Side-by-side analysis of two experiment runs</p>
+</div>
+
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Select Experiments</h3>
+  </div>
+  <div class="compare-grid">
+    <div class="form-group">
+      <label class="form-label">Experiment 1</label>
+      <select class="form-select" id="compare-exp1" onchange="loadComparison()">
+        <option value="">— Select —</option>
+        {% for exp in experiments %}
+        <option value="{{ exp.dir_name }}" {% if selected_1 == exp.dir_name %}selected{% endif %}>
+          {{ exp.experiment_id or exp.dir_name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Experiment 2</label>
+      <select class="form-select" id="compare-exp2" onchange="loadComparison()">
+        <option value="">— Select —</option>
+        {% for exp in experiments %}
+        <option value="{{ exp.dir_name }}" {% if selected_2 == exp.dir_name %}selected{% endif %}>
+          {{ exp.experiment_id or exp.dir_name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Comparison Results -->
+<div id="comparison-results" class="{% if not comparison %}hidden{% endif %}">
+  {% if comparison %}
+  <!-- Comparison Chart -->
+  <div class="card mb-lg">
+    <div class="card-header">
+      <h3>Power Comparison</h3>
+    </div>
+    <div class="chart-container">
+      <canvas id="compare-chart"></canvas>
+    </div>
+  </div>
+
+  <!-- Metrics Table -->
+  <div class="card mb-lg">
+    <div class="card-header">
+      <h3>Metric Comparison</h3>
+    </div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th class="text-right">{{ comparison.experiment_1.metadata.experiment_id or 'Exp 1' }}</th>
+            <th class="text-right">{{ comparison.experiment_2.metadata.experiment_id or 'Exp 2' }}</th>
+            <th class="text-right">Diff</th>
+            <th class="text-right">Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in comparison.metrics %}
+          <tr>
+            <td>{{ m.label }}</td>
+            <td class="text-right text-mono">{{ m.value_1 if m.value_1 is not none else '—' }}</td>
+            <td class="text-right text-mono">{{ m.value_2 if m.value_2 is not none else '—' }}</td>
+            <td class="text-right text-mono">
+              {% if m.diff is not none %}
+                {{ '%+.1f' | format(m.diff) }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td class="text-right">
+              {% if m.pct_change is not none %}
+                <span class="metric-diff {{ 'better' if m.pct_change < 0 else 'worse' if m.pct_change > 0 else 'neutral' }}">
+                  {{ '%+.1f' | format(m.pct_change) }}%
+                </span>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% if not comparison and not experiments %}
+<div class="card">
+  <div class="empty-state">
+    <div class="empty-icon">⚖️</div>
+    <p>No experiments to compare yet. Run at least two experiments first.</p>
+    <a href="/wizard" class="btn btn-primary">Start Experiment</a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function loadComparison() {
+  const exp1 = document.getElementById('compare-exp1')?.value;
+  const exp2 = document.getElementById('compare-exp2')?.value;
+  if (exp1 && exp2) {
+    window.location.href = `/compare?exp1=${encodeURIComponent(exp1)}&exp2=${encodeURIComponent(exp2)}`;
+  }
+}
+
+{% if comparison %}
+document.addEventListener('DOMContentLoaded', () => {
+  const s1 = {{ comparison.experiment_1.metadata | tojson | safe }};
+  const s2 = {{ comparison.experiment_2.metadata | tojson | safe }};
+  // Use summary data for chart
+  fetch(`/api/experiment/${encodeURIComponent('{{ comparison.experiment_1.id }}')}/summary`)
+    .then(r => r.json()).then(d1 => {
+      fetch(`/api/experiment/${encodeURIComponent('{{ comparison.experiment_2.id }}')}/summary`)
+        .then(r => r.json()).then(d2 => {
+          initCompareChart(d1, d2, s1.experiment_id || 'Exp 1', s2.experiment_id || 'Exp 2');
+        });
+    });
+});
+{% endif %}
+</script>
+{% endblock %}

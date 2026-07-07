@@ -13,6 +13,7 @@ def main():
     print(f"Loading {model_name} on the Apple Neural Engine via ANEForge...")
     
     try:
+        # Reverting to int8 because uncompressed fp16 is too large for the ANE
         model = af.load_llm(model_name, compress="int8")
         tokenizer = AutoTokenizer.from_pretrained(model_name)
     except Exception as e:

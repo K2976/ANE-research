@@ -1,7 +1,7 @@
 import os
 import sys
 
-repo_path = os.path.join(os.path.dirname(__file__), 'ANEForge-main')
+repo_path = "/Users/kartik/Documents/ANEForge-main"
 if repo_path not in sys.path:
     sys.path.insert(0, repo_path)
 
@@ -13,7 +13,7 @@ def main():
     print(f"Loading {model_name} on the Apple Neural Engine via ANEForge...")
     
     try:
-        model = af.load_llm(model_name, compress="int8")
+        model = af.load_llm(model_name, compress="fp32")
         tokenizer = AutoTokenizer.from_pretrained(model_name)
     except Exception as e:
         print(f"Error loading model: {e}")

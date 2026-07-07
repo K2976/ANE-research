@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — ANE Wizard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>Dashboard</h2>
+  <p>Your Apple Neural Engine experiment command center</p>
+</div>
+
+<!-- Quick Stats -->
+<div class="card-grid mb-lg">
+  <div class="stat-card">
+    <div class="stat-label">Total Experiments</div>
+    <div class="stat-value">{{ experiments | length }}</div>
+    <div class="stat-unit">experiments run</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Available Models</div>
+    <div class="stat-value">{{ models | length }}</div>
+    <div class="stat-unit">models detected</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Engine Status</div>
+    <div class="stat-value" style="font-size:1.2rem;">
+      {% if loaded_model %}
+        <span class="badge badge-warning">Model Loaded</span>
+      {% else %}
+        <span class="badge badge-success">Idle</span>
+      {% endif %}
+    </div>
+    <div class="stat-unit">{{ loaded_model or 'No model loaded' }}</div>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Quick Actions</h3>
+  </div>
+  <div class="action-grid">
+    <a href="/wizard" class="action-btn" id="btn-new-experiment">
+      <span class="action-icon">🧪</span>
+      New Experiment
+    </a>
+    <a href="/compare" class="action-btn" id="btn-compare">
+      <span class="action-icon">⚖️</span>
+      Compare Results
+    </a>
+    <a href="/experiments" class="action-btn" id="btn-all-experiments">
+      <span class="action-icon">📁</span>
+      View All Results
+    </a>
+  </div>
+</div>
+
+<!-- Available Models -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Available Models</h3>
+  </div>
+  {% if models %}
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Status</th>
+          <th>Parameters</th>
+          <th>Disk Size</th>
+          <th>INT8 Memory</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for model in models %}
+        <tr>
+          <td><strong>{{ model.short_name }}</strong><br><span class="text-muted" style="font-size:0.8rem;">{{ model.id }}</span></td>
+          <td>
+            {% if model.is_downloaded %}
+              <span class="badge badge-success">Downloaded</span>
+            {% else %}
+              <span class="badge badge-info">Available</span>
+            {% endif %}
+          </td>
+          <td class="text-mono">{{ model.param_count_b or '?' }}B</td>
+          <td class="text-mono">{{ model.disk_size_mb or '—' }} MB</td>
+          <td class="text-mono">{{ model.memory_estimates.int8_mb | default('—') }} MB</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">📦</div>
+    <p>No models found. Download a model to get started.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Recent Experiments -->
+<div class="card">
+  <div class="card-header">
+    <h3>Recent Experiments</h3>
+    {% if experiments %}
+    <a href="/experiments" class="btn btn-ghost btn-sm">View All →</a>
+    {% endif %}
+  </div>
+  {% if experiments %}
+    {% for exp in experiments[:5] %}
+    <a href="/results/{{ exp.dir_name }}" class="experiment-item" id="exp-{{ loop.index }}">
+      <div class="exp-name">
+        {{ exp.experiment_id or exp.dir_name }}
+        <span class="badge badge-{{ 'success' if exp.status == 'completed' else 'warning' }}" style="margin-left:8px;">
+          {{ exp.status or 'unknown' }}
+        </span>
+      </div>
+      <div class="exp-meta">
+        {{ exp.model_id or '' }}<br>
+        <span class="text-muted">{{ exp.compression or '' }} · {{ exp.timestamp or '' }}</span>
+      </div>
+    </a>
+    {% endfor %}
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">🧪</div>
+    <p>No experiments yet. Start your first experiment!</p>
+    <a href="/wizard" class="btn btn-primary" id="btn-first-experiment">Start Experiment</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

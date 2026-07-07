@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Running Experiment — ANE Wizard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>Experiment Running</h2>
+  <p>Live metrics and progress from your ANE benchmark</p>
+</div>
+
+<!-- Progress -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Progress</h3>
+    <button class="btn btn-danger btn-sm" id="cancel-experiment" onclick="cancelExperiment()">Cancel</button>
+  </div>
+  <div class="progress-bar-container">
+    <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+  </div>
+  <div class="progress-text">
+    <span id="progress-message">Initializing...</span>
+    <span id="progress-pct">0%</span>
+  </div>
+</div>
+
+<!-- Live Metrics -->
+<div class="card-grid mb-lg">
+  <div class="stat-card">
+    <div class="stat-label">CPU Power</div>
+    <div class="stat-value" id="live-cpu" style="font-size:1.3rem;">— mW</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">ANE Power</div>
+    <div class="stat-value" id="live-ane" style="font-size:1.3rem;">— mW</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">GPU Power</div>
+    <div class="stat-value" id="live-gpu" style="font-size:1.3rem;">— mW</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Tokens/sec</div>
+    <div class="stat-value" id="live-tps" style="font-size:1.3rem;">— tok/s</div>
+  </div>
+</div>
+
+<!-- Live Chart -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Power Over Time</h3>
+    <span class="badge badge-info">Live</span>
+  </div>
+  <div class="chart-container">
+    <canvas id="live-chart"></canvas>
+  </div>
+</div>
+
+<!-- Live Output -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Model Output</h3>
+  </div>
+  <div class="live-console" id="live-output" style="font-size:0.9rem; min-height:100px;"></div>
+</div>
+
+<!-- Validation Results -->
+<div class="card mb-lg hidden" id="validation-results-card">
+  <div class="card-header">
+    <h3>Validation</h3>
+  </div>
+  <div id="validation-results" class="hidden"></div>
+</div>
+
+<!-- Console Log -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Console</h3>
+  </div>
+  <div class="live-console" id="live-console"></div>
+</div>
+
+<!-- Post-Experiment Actions (hidden until complete) -->
+<div class="card hidden" id="post-actions">
+  <div class="card-header">
+    <h3>Experiment Complete 🎉</h3>
+  </div>
+  <div class="action-grid">
+    <a class="action-btn" onclick="window.location.href='/results/' + document.getElementById('post-actions').dataset.experimentId" id="btn-view-results">
+      <span class="action-icon">📊</span>
+      View Report
+    </a>
+    <a class="action-btn" onclick="window.location.href='/compare'" id="btn-compare-results">
+      <span class="action-icon">⚖️</span>
+      Compare Results
+    </a>
+    <a class="action-btn" onclick="window.location.href='/wizard'" id="btn-duplicate">
+      <span class="action-icon">🔄</span>
+      New Experiment
+    </a>
+    <a class="action-btn" onclick="window.location.href='/'" id="btn-dashboard">
+      <span class="action-icon">🏠</span>
+      Dashboard
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    initLiveChart();
+    addConsoleLog('Waiting for experiment to start...', 'info');
+  });
+</script>
+{% endblock %}

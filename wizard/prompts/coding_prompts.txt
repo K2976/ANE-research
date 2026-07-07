@@ -1,0 +1,5 @@
+Write a Python function to solve the N-Queens problem using backtracking.
+Write a function that finds the longest common subsequence of two strings.
+Implement a binary search tree with insert, delete, and search operations.
+Write a function to detect a cycle in a linked list using Floyd's algorithm.
+Implement Dijkstra's shortest path algorithm for a weighted graph.

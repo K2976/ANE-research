@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ANE Experiment Wizard{% endblock %}</title>
+  <meta name="description" content="Professional benchmarking tool for Apple Neural Engine LLM experiments">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">⚡</div>
+        <div>
+          <h1>ANE Wizard</h1>
+          <span>Experiment Runner</span>
+        </div>
+      </div>
+
+      <ul class="sidebar-nav">
+        <li><a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}" id="nav-dashboard">
+          <span class="nav-icon">📊</span> Dashboard
+        </a></li>
+        <li><a href="/wizard" class="{% if active_page == 'wizard' %}active{% endif %}" id="nav-wizard">
+          <span class="nav-icon">🧪</span> New Experiment
+        </a></li>
+        <li><a href="/experiments" class="{% if active_page == 'experiments' %}active{% endif %}" id="nav-experiments">
+          <span class="nav-icon">📁</span> All Experiments
+        </a></li>
+        <li><a href="/compare" class="{% if active_page == 'compare' %}active{% endif %}" id="nav-compare">
+          <span class="nav-icon">⚖️</span> Compare
+        </a></li>
+      </ul>
+
+      <div class="sidebar-status">
+        <span id="status-dot" class="status-dot idle"></span>
+        <span id="status-text">Ready</span>
+        {% if loaded_model %}
+        <div class="mt-sm" style="font-size:0.75rem;">
+          Loaded: {{ loaded_model }}
+        </div>
+        {% endif %}
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <!-- Confirmation Dialog -->
+  <div class="dialog-overlay" id="dialog-overlay">
+    <div class="dialog">
+      <h3 id="dialog-title">Confirm</h3>
+      <p id="dialog-message">Are you sure?</p>
+      <div class="dialog-actions">
+        <button class="btn btn-secondary" id="dialog-cancel">Cancel</button>
+        <button class="btn btn-danger" id="dialog-confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="/static/js/app.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Results: {{ metadata.experiment_id }} — ANE Wizard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>{{ metadata.experiment_id or 'Experiment Results' }}</h2>
+  <p>{{ metadata.model_id }} · {{ metadata.compression or 'int8' }} · {{ metadata.timestamp or '' }}</p>
+</div>
+
+<!-- Summary Stats -->
+<div class="card-grid mb-lg">
+  <div class="stat-card">
+    <div class="stat-label">Avg Tokens/sec</div>
+    <div class="stat-value">{{ '%.1f' | format(metadata.avg_tokens_per_sec or 0) }}</div>
+    <div class="stat-unit">tok/s</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Avg ANE Power</div>
+    <div class="stat-value">{{ '%.1f' | format(summary.avg_ane_mw or 0) }}</div>
+    <div class="stat-unit">mW</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total Compute Energy</div>
+    <div class="stat-value">{{ '%.3f' | format(summary.total_compute_joules or 0) }}</div>
+    <div class="stat-unit">Joules</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">ANE Active</div>
+    <div class="stat-value">{{ summary.ane_active_pct or 0 }}</div>
+    <div class="stat-unit">% of samples</div>
+  </div>
+</div>
+
+<!-- Power Chart -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Power Over Time</h3>
+  </div>
+  <div class="chart-container">
+    <canvas id="results-chart"></canvas>
+  </div>
+</div>
+
+<!-- Detailed Metrics -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Detailed Metrics</h3>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr><th>Metric</th><th>Value</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Model</td><td class="text-mono">{{ metadata.model_id }}</td></tr>
+        <tr><td>Compression</td><td class="text-mono">{{ metadata.compression or 'fp16' }}</td></tr>
+        <tr><td>Benchmark Runs</td><td class="text-mono">{{ metadata.benchmark_runs }}</td></tr>
+        <tr><td>Total Tokens Generated</td><td class="text-mono">{{ metadata.total_tokens_generated or '—' }}</td></tr>
+        <tr><td>Avg Latency</td><td class="text-mono">{{ metadata.avg_latency_ms or '—' }} ms</td></tr>
+        <tr><td>Duration</td><td class="text-mono">{{ summary.duration_sec or '—' }} s</td></tr>
+        <tr><td>Samples Collected</td><td class="text-mono">{{ summary.sample_count or '—' }}</td></tr>
+        <tr><td colspan="2" style="padding-top:var(--space-md);"><strong style="color:var(--text-muted);">RAW POWER</strong></td></tr>
+        <tr><td>Avg CPU Power</td><td class="text-mono">{{ summary.avg_cpu_mw or '—' }} mW</td></tr>
+        <tr><td>Avg GPU Power</td><td class="text-mono">{{ summary.avg_gpu_mw or '—' }} mW</td></tr>
+        <tr><td>Avg ANE Power</td><td class="text-mono">{{ summary.avg_ane_mw or '—' }} mW</td></tr>
+        <tr><td>Avg Combined Power</td><td class="text-mono">{{ summary.avg_combined_mw or '—' }} mW</td></tr>
+        <tr><td colspan="2" style="padding-top:var(--space-md);"><strong style="color:var(--text-muted);">NET POWER (model only)</strong></td></tr>
+        <tr><td>Net CPU</td><td class="text-mono">{{ summary.avg_net_cpu_mw or '—' }} mW</td></tr>
+        <tr><td>Net ANE</td><td class="text-mono">{{ summary.avg_net_ane_mw or '—' }} mW</td></tr>
+        <tr><td>Compute (ANE+CPU)</td><td class="text-mono" style="color:var(--accent-tertiary); font-weight:700;">{{ summary.avg_compute_mw or '—' }} mW</td></tr>
+        <tr><td colspan="2" style="padding-top:var(--space-md);"><strong style="color:var(--text-muted);">ENERGY</strong></td></tr>
+        <tr><td>Total Compute</td><td class="text-mono" style="color:var(--accent-tertiary); font-weight:700;">{{ summary.total_compute_joules or '—' }} J</td></tr>
+        <tr><td>Compute J/sec</td><td class="text-mono">{{ summary.compute_joules_per_sec or '—' }} J/s</td></tr>
+        {% if summary.joules_per_token %}
+        <tr><td>Energy per Token</td><td class="text-mono" style="color:var(--color-success); font-weight:700;">{{ summary.joules_per_token }} J/token</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Notes -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Notes</h3>
+    <button class="btn btn-secondary btn-sm" onclick="saveNotes('{{ metadata.experiment_id }}')">Save Notes</button>
+  </div>
+  <textarea class="form-textarea" id="experiment-notes-edit" placeholder="Add research notes, observations, or hypotheses..." style="font-family:var(--font-sans);">{{ notes or '' }}</textarea>
+</div>
+
+<!-- Actions -->
+<div class="card">
+  <div class="card-header">
+    <h3>Actions</h3>
+  </div>
+  <div class="action-grid">
+    <a href="/compare?exp1={{ metadata.experiment_id }}" class="action-btn" id="btn-compare">
+      <span class="action-icon">⚖️</span>
+      Compare
+    </a>
+    <a href="/api/experiment/{{ metadata.experiment_id }}/export?format=json" class="action-btn" id="btn-export-json" target="_blank">
+      <span class="action-icon">📄</span>
+      Export JSON
+    </a>
+    <a href="/api/experiment/{{ metadata.experiment_id }}/export?format=csv" class="action-btn" id="btn-export-csv" target="_blank">
+      <span class="action-icon">📊</span>
+      Export CSV
+    </a>
+    <a href="/wizard" class="action-btn" id="btn-new">
+      <span class="action-icon">🔄</span>
+      New Experiment
+    </a>
+    <a href="/" class="action-btn" id="btn-home">
+      <span class="action-icon">🏠</span>
+      Dashboard
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const chartData = {{ chart_data | tojson | safe }};
+    if (chartData) initResultsChart(chartData);
+  });
+</script>
+{% endblock %}

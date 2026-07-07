@@ -1,0 +1,12 @@
+[
+  {
+    "prompt": "Explain how rain works in simple terms.",
+    "output": "Rain is a vital part of the Earth's water cycle. Here's how it works in simple terms:\n\n1. **Evaporation**: The sun heats the Earth's surface, causing water to evaporate from oceans, lakes, and rivers.\n2. **Condensation**: As water vapor rises into the air, it cools down, and its water vapor condenses into tiny droplets.\n3. **Cloud Formation**: These condensed droplets gather together in the air, forming clouds.\n4. **Precipitation**: When the clouds become saturated with water, the droplets become too heavy to remain suspended in the air. At this point, the water falls to the ground as precipitation, which can take the form of rain, snow, sleet, or hail.\n\nThis is a simplified explanation of the water cycle, but it should give you a good understanding of how rain works.",
+    "tokens_generated": 177,
+    "prompt_tokens": 45,
+    "elapsed_sec": 119.095,
+    "tokens_per_sec": 1.49,
+    "latency_ms": 119095.0,
+    "timestamp": "2026-07-07T14:39:44.897636"
+  }
+]

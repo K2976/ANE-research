@@ -1,0 +1,41 @@
+{
+  "chip": "Apple_M4_base_iMac",
+  "aneforge_path": "/Users/kartik/Documents/ANEForge-main",
+  "huggingface_cache": "~/.cache/huggingface/hub",
+  "output_dir": "./power_logs",
+  "idle_baseline": {
+    "cpu_mw": 18.0,
+    "gpu_mw": 3.4,
+    "ane_mw": 0.0
+  },
+  "ane_active_threshold_mw": 10.0,
+  "default_max_len": 2048,
+  "default_compression": "int8",
+  "metric_profiles": {
+    "quick": {
+      "duration_sec": 30,
+      "warmup_runs": 1,
+      "benchmark_runs": 1,
+      "interval_ms": 1000,
+      "metrics": ["cpu_mw", "ane_mw", "tokens_per_sec"]
+    },
+    "research": {
+      "duration_sec": 60,
+      "warmup_runs": 2,
+      "benchmark_runs": 3,
+      "interval_ms": 1000,
+      "metrics": ["cpu_mw", "gpu_mw", "ane_mw", "combined_mw", "net_cpu_mw", "net_ane_mw", "compute_mw", "joules", "tokens_per_sec", "e_cluster_pct", "p_cluster_pct"]
+    },
+    "full": {
+      "duration_sec": 120,
+      "warmup_runs": 3,
+      "benchmark_runs": 5,
+      "interval_ms": 500,
+      "metrics": ["cpu_mw", "gpu_mw", "ane_mw", "combined_mw", "net_cpu_mw", "net_gpu_mw", "net_ane_mw", "compute_mw", "joules", "tokens_per_sec", "e_cluster_pct", "p_cluster_pct", "gpu_active_pct", "gpu_freq_mhz", "thermal", "latency_histogram"]
+    }
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 5050
+  }
+}

@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}New Experiment — ANE Wizard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>New Experiment</h2>
+  <p>Configure and launch an LLM benchmark on the Apple Neural Engine</p>
+</div>
+
+<!-- Wizard Progress -->
+<div class="wizard-progress">
+  <div class="wizard-step-indicator">
+    <div class="wizard-dot active" onclick="goToStep(1)">1<span class="wizard-step-label">Model</span></div>
+    <div class="wizard-line"></div>
+    <div class="wizard-dot" onclick="goToStep(2)">2<span class="wizard-step-label">Prompts</span></div>
+    <div class="wizard-line"></div>
+    <div class="wizard-dot" onclick="goToStep(3)">3<span class="wizard-step-label">Eval</span></div>
+    <div class="wizard-line"></div>
+    <div class="wizard-dot" onclick="goToStep(4)">4<span class="wizard-step-label">Metrics</span></div>
+    <div class="wizard-line"></div>
+    <div class="wizard-dot" onclick="goToStep(5)">5<span class="wizard-step-label">Review</span></div>
+  </div>
+</div>
+
+<div class="card">
+  <!-- ═══ STEP 1: Select Model ═══ -->
+  <div class="wizard-panel active" id="step-1">
+    <h3 style="margin-bottom:var(--space-lg);">Select Model</h3>
+
+    <div class="form-group">
+      <label class="form-label">Search Models</label>
+      <div class="form-search">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="form-input" id="model-search" placeholder="Type to filter models..." oninput="filterModels()">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Model</label>
+      <select class="form-select" id="model-select">
+        <option value="">— Select a model —</option>
+        {% for model in models %}
+        <option value="{{ model.id }}">
+          {{ model.short_name }} ({{ model.param_count_b or '?' }}B) {% if not model.is_downloaded %}⬇️ Will download{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <div class="form-hint">Only one model can be loaded at a time. Models not yet downloaded will be fetched automatically.</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Compression</label>
+      <select class="form-select" id="compression">
+        <option value="int4">INT4 — Smallest, fastest decode</option>
+        <option value="int8" selected>INT8 — Recommended balance</option>
+        <option value="None">FP16 — Full precision (slow, may fail for large models)</option>
+      </select>
+      <div class="form-hint">INT8 is recommended. The ANE dequantizes to FP16 on-chip, so quality loss is minimal.</div>
+    </div>
+  </div>
+
+  <!-- ═══ STEP 2: Prompt Source ═══ -->
+  <div class="wizard-panel" id="step-2">
+    <h3 style="margin-bottom:var(--space-lg);">Select Prompt Source</h3>
+
+    <div class="form-group">
+      <label class="form-label">Source</label>
+      <select class="form-select" id="prompt-source" onchange="onPromptSourceChange()">
+        <option value="single">Single Prompt</option>
+        <option value="file">Prompt File</option>
+        <option value="dataset">Built-in Dataset</option>
+      </select>
+    </div>
+
+    <!-- Single Prompt -->
+    <div class="prompt-panel" id="prompt-single">
+      <div class="form-group">
+        <label class="form-label">Prompt</label>
+        <textarea class="form-textarea" id="prompt-text" placeholder="Type your prompt here...">Explain how photosynthesis works in simple terms.</textarea>
+      </div>
+    </div>
+
+    <!-- File -->
+    <div class="prompt-panel hidden" id="prompt-file">
+      <div class="form-group">
+        <label class="form-label">File Path</label>
+        <input type="text" class="form-input" id="prompt-file-path" placeholder="/path/to/prompts.txt">
+        <div class="form-hint">One prompt per line. The file will be validated before starting.</div>
+      </div>
+    </div>
+
+    <!-- Dataset -->
+    <div class="prompt-panel hidden" id="prompt-dataset">
+      <div class="form-group">
+        <label class="form-label">Dataset</label>
+        <select class="form-select" id="prompt-dataset-select">
+          <option value="coding">Coding Problems (5 prompts)</option>
+          <option value="reasoning">Reasoning & Logic (5 prompts)</option>
+          <option value="general">General Knowledge (5 prompts)</option>
+        </select>
+        <div class="form-hint">Built-in benchmark prompt sets for standardized testing.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ STEP 3: Evaluation Mode ═══ -->
+  <div class="wizard-panel" id="step-3">
+    <h3 style="margin-bottom:var(--space-lg);">Select Evaluation Mode</h3>
+
+    <div class="form-group">
+      <label class="form-label">Mode</label>
+      <select class="form-select" id="eval-mode">
+        <option value="single">Single Prompt — Run one prompt, stream output</option>
+        <option value="batch">Batch — Run all prompts sequentially, collect aggregate stats</option>
+        <option value="dataset">Dataset — Run a full dataset with detailed per-prompt metrics</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Max Context Length</label>
+      <select class="form-select" id="max-len">
+        <option value="256">256 tokens</option>
+        <option value="512" selected>512 tokens</option>
+        <option value="1024">1024 tokens</option>
+        <option value="2048">2048 tokens</option>
+      </select>
+      <div class="form-hint">Larger context = more memory, longer warmup. 512 is good for most benchmarks.</div>
+    </div>
+  </div>
+
+  <!-- ═══ STEP 4: Metric Profile ═══ -->
+  <div class="wizard-panel" id="step-4">
+    <h3 style="margin-bottom:var(--space-lg);">Select Metric Profile</h3>
+
+    <div class="form-group">
+      <label class="form-label">Profile</label>
+      <select class="form-select" id="metric-profile">
+        <option value="quick">Quick — CPU + ANE power, tokens/sec (1 run, 30s)</option>
+        <option value="research" selected>Research — All power metrics + net energy + joules/token (3 runs, 60s)</option>
+        <option value="full">Full — Everything + thermal + GPU + latency histogram (5 runs, 120s)</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Warmup Runs</label>
+      <select class="form-select" id="warmup-runs">
+        <option value="1" selected>1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+      </select>
+      <div class="form-hint">How many warmup iterations before benchmarking begins.</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Benchmark Runs</label>
+      <select class="form-select" id="benchmark-runs">
+        <option value="1">1</option>
+        <option value="3" selected>3</option>
+        <option value="5">5</option>
+        <option value="10">10</option>
+      </select>
+      <div class="form-hint">Number of times each prompt is run. More runs = more statistically reliable results.</div>
+    </div>
+  </div>
+
+  <!-- ═══ STEP 5: Review ═══ -->
+  <div class="wizard-panel" id="step-5">
+    <h3 style="margin-bottom:var(--space-lg);">Review Configuration</h3>
+
+    <div class="review-grid">
+      <div class="review-label">Model</div>
+      <div class="review-value" id="review-model">—</div>
+
+      <div class="review-label">Compression</div>
+      <div class="review-value" id="review-compression">—</div>
+
+      <div class="review-label">Prompt Source</div>
+      <div class="review-value" id="review-prompt-source">—</div>
+
+      <div class="review-label">Evaluation Mode</div>
+      <div class="review-value" id="review-eval-mode">—</div>
+
+      <div class="review-label">Metric Profile</div>
+      <div class="review-value" id="review-metric-profile">—</div>
+
+      <div class="review-label">Max Context</div>
+      <div class="review-value" id="review-max-len">—</div>
+
+      <div class="review-label">Warmup Runs</div>
+      <div class="review-value" id="review-warmup-runs">—</div>
+
+      <div class="review-label">Benchmark Runs</div>
+      <div class="review-value" id="review-benchmark-runs">—</div>
+
+      <div class="review-label">Execution Device</div>
+      <div class="review-value" id="review-device">Apple Neural Engine</div>
+
+      <div class="review-label">Est. Memory</div>
+      <div class="review-value" id="review-memory">—</div>
+    </div>
+
+    <div class="form-group mt-lg">
+      <label class="form-label">Experiment Name (optional)</label>
+      <input type="text" class="form-input" id="experiment-name" placeholder="Auto-generated if left blank">
+      <div class="form-hint">Example: Llama3.2-1B_INT8_Single_2026-07-08_14-30</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Notes (optional)</label>
+      <textarea class="form-textarea" id="experiment-notes" placeholder="Record observations, hypotheses, or configuration notes..." style="min-height:80px; font-family: var(--font-sans);"></textarea>
+    </div>
+  </div>
+
+  <!-- Wizard Actions -->
+  <div class="wizard-actions">
+    <button class="btn btn-secondary hidden" id="wizard-back" onclick="prevStep()">← Back</button>
+    <div></div>
+    <button class="btn btn-primary" id="wizard-next" onclick="nextStep()">Next →</button>
+    <button class="btn btn-primary btn-lg hidden" id="wizard-start" onclick="startExperiment()">
+      🚀 Start Experiment
+    </button>
+  </div>
+</div>
+{% endblock %}
