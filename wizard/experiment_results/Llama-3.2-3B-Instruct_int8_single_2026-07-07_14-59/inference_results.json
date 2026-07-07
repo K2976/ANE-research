@@ -1,0 +1,12 @@
+[
+  {
+    "prompt": "Explain how photosynthesis works in simple terms.",
+    "output": "Photosynthesis is the process by which plants, algae, and some bacteria convert light energy from the sun into chemical energy in the form of glucose.\n\nHere's a simplified explanation of the process:\n\n1. **Light absorption**: Plants absorb light energy from the sun through specialized pigments such as chlorophyll.\n2. **Water absorption**: Plants absorb water from the soil through their roots.\n3. **Carbon dioxide absorption**: Plants absorb carbon dioxide from the air through small openings on their leaves called stomata.\n4. **Light-dependent reactions**: The absorbed light energy is used to convert water and carbon dioxide into glucose and oxygen through a series of chemical reactions.\n5. **Calvin cycle**: The glucose produced in the light-dependent reactions is then used in the Calvin cycle, a series of chemical reactions that convert carbon dioxide into glucose.\n\nIn summary, photosynthesis is the process by which plants, algae, and some bacteria convert light energy from the sun into chemical energy in the form of glucose.",
+    "tokens_generated": 198,
+    "prompt_tokens": 46,
+    "elapsed_sec": 127.124,
+    "tokens_per_sec": 1.56,
+    "latency_ms": 127123.8,
+    "timestamp": "2026-07-07T15:04:12.645397"
+  }
+]
