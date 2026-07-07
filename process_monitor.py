@@ -31,8 +31,8 @@ def find_model_process():
     for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
         try:
             cmdline = " ".join(proc.info['cmdline'] or [])
-            # Search for the llama script specifically
-            if "run_llama_3_2_1b" in cmdline and "process_monitor" not in cmdline:
+            # Search for any llama script (e.g. run_llama_3_2_1b.py or run_llama_3_2_3b.py)
+            if "run_llama_3_2" in cmdline and "process_monitor" not in cmdline:
                 return proc
         except:
             pass

@@ -1,0 +1,31 @@
+{
+  "label": "run",
+  "chip": "Apple_M4_base_iMac",
+  "sample_count": 58,
+  "duration_sec": 58.0,
+  "timestamp_start": "2026-07-07T10:53:19.810132",
+  "timestamp_end": "2026-07-07T10:54:17.202406",
+  "idle_baseline_used": {
+    "cpu_mw": 18.0,
+    "gpu_mw": 3.4,
+    "ane_mw": 0.0
+  },
+  "dram_note": "DRAM power not exposed on Apple M4. Not included in metrics.",
+  "avg_cpu_mw": 3585.333,
+  "avg_gpu_mw": 21.667,
+  "avg_ane_mw": 5.167,
+  "avg_combined_mw": 3612.0,
+  "avg_net_cpu_mw": 3567.333,
+  "avg_net_gpu_mw": 18.267,
+  "avg_net_ane_mw": 5.167,
+  "avg_compute_mw": 3572.5,
+  "total_cpu_joules": 170.257,
+  "total_ane_joules": 0.031,
+  "total_net_cpu_joules": 169.213,
+  "total_net_ane_joules": 0.031,
+  "total_compute_joules": 169.244,
+  "total_combined_joules": 171.788,
+  "ane_active_samples": 0,
+  "ane_active_pct": 0.0,
+  "compute_joules_per_sec": 2.918
+}
