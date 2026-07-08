@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Layer Profiling — ANE Wizard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>🧪 Layer Profiling</h2>
+  <p>Profile individual sub-layers (Attention, MLP, LayerNorm) to generate empirical Energy and Accuracy databases for mixed-precision quantization research</p>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3>Profiling Configuration</h3>
+    <span class="badge badge-purple">E(i,b) + ΔA(i,b)</span>
+  </div>
+
+  <!-- Row 1: Model & Mode -->
+  <div class="profiling-form-grid">
+    <div class="form-group">
+      <label class="form-label">Model</label>
+      <select class="form-select" id="prof-model">
+        <option value="">— Select a model —</option>
+        {% for model in models %}
+        <option value="{{ model.id }}">
+          {{ model.short_name }} ({{ model.param_count_b or '?' }}B) {% if not model.is_downloaded %}⬇️{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <div class="form-hint">Blocks will be auto-detected after selection.</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Profiling Mode</label>
+      <select class="form-select" id="prof-mode" onchange="onProfilingModeChange()">
+        <option value="entire_model">Entire Model — All blocks, all sub-layers</option>
+        <option value="single_sublayer">Single Sub-layer Type — Across all blocks</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Row 2: Sub-layer & Bit Width -->
+  <div class="profiling-form-grid">
+    <div class="form-group" id="sublayer-group">
+      <label class="form-label">Sub-layer Type</label>
+      <select class="form-select" id="prof-sublayer">
+        <option value="attention">Attention</option>
+        <option value="mlp">MLP</option>
+        <option value="layernorm">LayerNorm</option>
+      </select>
+      <div class="form-hint">For single mode: only this sub-layer type is profiled across all blocks.</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Bit Widths to Test</label>
+      <div class="checkbox-row">
+        <label class="checkbox-label">
+          <input type="checkbox" value="fp16" id="bw-fp16"> FP16
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" value="int8" id="bw-int8" checked> INT8
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" value="int4" id="bw-int4" checked> INT4
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" value="int2" id="bw-int2"> INT2
+        </label>
+      </div>
+      <div class="form-hint">Select one or more. Each sub-layer is profiled at every selected bit width.</div>
+    </div>
+  </div>
+
+  <!-- Row 3: Dataset & Duration -->
+  <div class="profiling-form-grid">
+    <div class="form-group">
+      <label class="form-label">Evaluation Dataset</label>
+      <select class="form-select" id="prof-dataset">
+        <option value="wikitext2">WikiText-2 (sample, 50 texts)</option>
+        <option value="ptb">Penn Treebank (sample, 50 texts)</option>
+      </select>
+      <div class="form-hint">Used for accuracy (perplexity) measurement.</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Profiling Duration (per sub-layer)</label>
+      <select class="form-select" id="prof-duration">
+        <option value="15">15 seconds</option>
+        <option value="30" selected>30 seconds</option>
+        <option value="45">45 seconds</option>
+        <option value="60">60 seconds</option>
+      </select>
+      <div class="form-hint">How long to run inference for energy measurement per combination.</div>
+    </div>
+  </div>
+
+  <!-- Row 4: Warmup & Benchmark -->
+  <div class="profiling-form-grid">
+    <div class="form-group">
+      <label class="form-label">Warmup Runs</label>
+      <input type="number" class="form-input" id="prof-warmup" value="1" min="0" max="5">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Max Context Length</label>
+      <select class="form-select" id="prof-maxlen">
+        <option value="128">128 tokens</option>
+        <option value="256">256 tokens</option>
+        <option value="512" selected>512 tokens</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Collection Checkboxes -->
+  <div class="form-group">
+    <label class="form-label">Data Collection</label>
+    <div class="checkbox-grid">
+      <label class="checkbox-label"><input type="checkbox" id="collect-energy" checked> ⚡ Collect Energy</label>
+      <label class="checkbox-label"><input type="checkbox" id="collect-accuracy" checked> 🎯 Collect Accuracy</label>
+      <label class="checkbox-label"><input type="checkbox" id="collect-temperature" checked> 🌡️ Collect Temperature</label>
+      <label class="checkbox-label"><input type="checkbox" id="collect-power" checked> 🔌 Collect Power</label>
+    </div>
+  </div>
+
+  <!-- Model Structure Preview -->
+  <div class="form-group" id="structure-preview" style="display:none;">
+    <label class="form-label">Detected Model Structure</label>
+    <div class="structure-card" id="structure-info">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+
+  <!-- Profiling Schedule Preview -->
+  <div class="form-group" id="schedule-preview" style="display:none;">
+    <label class="form-label">Profiling Schedule</label>
+    <div class="structure-card" id="schedule-info">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+</div>
+
+<!-- Action Buttons -->
+<div class="profiling-actions">
+  <button class="btn btn-primary btn-lg" id="btn-run-profiling" onclick="startProfiling()">
+    🚀 Run Layer Profiling
+  </button>
+  <button class="btn btn-secondary hidden" id="btn-pause" onclick="pauseProfiling()">
+    ⏸️ Pause
+  </button>
+  <button class="btn btn-secondary hidden" id="btn-resume" onclick="resumeProfiling()">
+    ▶️ Resume
+  </button>
+  <button class="btn btn-danger hidden" id="btn-cancel" onclick="cancelProfiling()">
+    ✗ Cancel
+  </button>
+  <a href="/profiling/history" class="btn btn-secondary">
+    📁 View History
+  </a>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/profiling.js"></script>
+<script>
+  // Detect model structure when selection changes
+  document.getElementById('prof-model').addEventListener('change', function() {
+    const modelId = this.value;
+    if (!modelId) {
+      document.getElementById('structure-preview').style.display = 'none';
+      document.getElementById('schedule-preview').style.display = 'none';
+      return;
+    }
+    detectModelStructure(modelId);
+  });
+
+  // Update schedule preview when config changes
+  ['prof-mode', 'prof-sublayer', 'prof-duration'].forEach(id => {
+    document.getElementById(id).addEventListener('change', updateSchedulePreview);
+  });
+  document.querySelectorAll('[id^="bw-"]').forEach(cb => {
+    cb.addEventListener('change', updateSchedulePreview);
+  });
+</script>
+{% endblock %}

@@ -24,6 +24,12 @@ from wizard.engine import ExperimentEngine
 from wizard.results import list_experiments, get_experiment, compare_experiments, save_notes, export_report, get_output_dir
 from wizard.validator import validate
 
+# Import layer profiling modules
+from wizard.layer_profiler import LayerProfilingEngine, detect_model_structure
+from wizard.layer_db import list_profiling_runs, get_profiling_run, delete_profiling_run
+from wizard.layer_reports import export_profiling_run
+from wizard.layer_accuracy import get_available_datasets
+
 # ── App Setup ─────────────────────────────────────────────────────────────
 
 app = Flask(__name__,
@@ -35,6 +41,9 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Global engine instance
 engine = None
+
+# Global layer profiling engine instance
+profiling_engine = None
 
 
 def get_all_models():
@@ -146,6 +155,54 @@ def compare_page():
                            loaded_model=loaded)
 
 
+@app.route('/profiling')
+def profiling_page():
+    models = get_all_models()
+    loaded = ExperimentEngine.get_loaded_model()
+    return render_template('profiling.html',
+                           active_page='profiling',
+                           models=models,
+                           loaded_model=loaded)
+
+
+@app.route('/profiling/live')
+def profiling_live_page():
+    loaded = ExperimentEngine.get_loaded_model()
+    return render_template('profiling_live.html',
+                           active_page='profiling',
+                           loaded_model=loaded)
+
+
+@app.route('/profiling/results/<run_id>')
+def profiling_results_page(run_id):
+    run = get_profiling_run(run_id)
+    if not run:
+        return redirect('/profiling/history')
+        
+    metadata = run.get('metadata', {})
+    energy_records = run.get('energy_records', [])
+    accuracy_records = run.get('accuracy_records', [])
+    
+    loaded = ExperimentEngine.get_loaded_model()
+    return render_template('profiling_results.html',
+                           active_page='profiling',
+                           run_id=run_id,
+                           metadata=metadata,
+                           energy_records=energy_records,
+                           accuracy_records=accuracy_records,
+                           loaded_model=loaded)
+
+
+@app.route('/profiling/history')
+def profiling_history_page():
+    runs = list_profiling_runs()
+    loaded = ExperimentEngine.get_loaded_model()
+    return render_template('profiling_history.html',
+                           active_page='profiling_history',
+                           runs=runs,
+                           loaded_model=loaded)
+
+
 # ── API Routes ────────────────────────────────────────────────────────────
 
 @app.route('/api/models')
@@ -253,6 +310,92 @@ def api_validate():
     config = request.json
     results = validate(config)
     return jsonify(results)
+
+
+@app.route('/api/profiling/structure/<path:model_id>')
+def api_profiling_structure(model_id):
+    return jsonify(detect_model_structure(model_id))
+
+
+@app.route('/api/profiling/start', methods=['POST'])
+def api_profiling_start():
+    global profiling_engine
+    
+    if profiling_engine and profiling_engine.running:
+        return jsonify({"error": "A profiling run is already active"}), 400
+        
+    config = request.json
+    
+    def emit_fn(event, data):
+        socketio.emit(event, data)
+        
+    profiling_engine = LayerProfilingEngine(emit_fn=emit_fn)
+    profiling_engine.start(config)
+    
+    return jsonify({"status": "started"})
+
+
+@app.route('/api/profiling/pause', methods=['POST'])
+def api_profiling_pause():
+    global profiling_engine
+    if profiling_engine and profiling_engine.running:
+        profiling_engine.pause()
+        return jsonify({"status": "paused"})
+    return jsonify({"status": "no active run"}), 400
+
+
+@app.route('/api/profiling/resume', methods=['POST'])
+def api_profiling_resume():
+    global profiling_engine
+    if profiling_engine and profiling_engine.running:
+        profiling_engine.resume()
+        return jsonify({"status": "resumed"})
+    return jsonify({"status": "no active run"}), 400
+
+
+@app.route('/api/profiling/cancel', methods=['POST'])
+def api_profiling_cancel():
+    global profiling_engine
+    if profiling_engine and profiling_engine.running:
+        profiling_engine.cancel()
+        return jsonify({"status": "cancelling"})
+    return jsonify({"status": "no active run"}), 400
+
+
+@app.route('/api/profiling/<run_id>', methods=['DELETE'])
+def api_profiling_delete(run_id):
+    success = delete_profiling_run(run_id)
+    return jsonify({"success": success})
+
+
+@app.route('/api/profiling/<run_id>/export')
+def api_profiling_export(run_id):
+    fmt = request.args.get('format', 'json')
+    content = export_profiling_run(run_id, fmt)
+    
+    if not content:
+        return jsonify({"error": "Run not found"}), 404
+        
+    mimetype_map = {
+        'json': 'application/json',
+        'csv': 'text/csv',
+        'markdown': 'text/markdown',
+        'latex': 'text/plain'
+    }
+    
+    ext_map = {
+        'json': 'json',
+        'csv': 'csv',
+        'markdown': 'md',
+        'latex': 'tex'
+    }
+    
+    mimetype = mimetype_map.get(fmt, 'application/json')
+    ext = ext_map.get(fmt, 'json')
+    filename = f"{run_id}.{ext}"
+    
+    return Response(content, mimetype=mimetype,
+                    headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
 # ── WebSocket Events ──────────────────────────────────────────────────────

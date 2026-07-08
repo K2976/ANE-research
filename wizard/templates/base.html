@@ -34,6 +34,13 @@
         <li><a href="/compare" class="{% if active_page == 'compare' %}active{% endif %}" id="nav-compare">
           <span class="nav-icon">⚖️</span> Compare
         </a></li>
+        <li style="margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--border-subtle);"></li>
+        <li><a href="/profiling" class="{% if active_page == 'profiling' %}active{% endif %}" id="nav-profiling">
+          <span class="nav-icon">🧪</span> Layer Profiling
+        </a></li>
+        <li><a href="/profiling/history" class="{% if active_page == 'profiling_history' %}active{% endif %}" id="nav-profiling-history">
+          <span class="nav-icon">🗂️</span> Profiling History
+        </a></li>
       </ul>
 
       <div class="sidebar-status">

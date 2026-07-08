@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Profiling Results — ANE Wizard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>📊 Profiling Results</h2>
+  <p>{{ metadata.get('model', 'Unknown Model') }} — {{ metadata.get('timestamp', '')[:16] }}</p>
+</div>
+
+<!-- Summary Stats -->
+<div class="card-grid mb-lg">
+  <div class="stat-card">
+    <div class="stat-label">ENERGY RECORDS</div>
+    <div class="stat-value">{{ energy_records | length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">ACCURACY RECORDS</div>
+    <div class="stat-value">{{ accuracy_records | length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">BLOCKS PROFILED</div>
+    <div class="stat-value">{{ metadata.get('n_layers', 0) }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">BIT WIDTHS</div>
+    <div class="stat-value">{{ metadata.get('bit_widths', []) | length }}</div>
+  </div>
+</div>
+
+<!-- Visualizations -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Energy Heatmap — E(i,b)</h3>
+    <span class="badge badge-info">Block × Bit Width</span>
+  </div>
+  <div class="heatmap-container" id="energy-heatmap"></div>
+</div>
+
+{% if accuracy_records %}
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Accuracy Heatmap — ΔA(i,b)</h3>
+    <span class="badge badge-info">Block × Bit Width</span>
+  </div>
+  <div class="heatmap-container" id="accuracy-heatmap"></div>
+</div>
+{% endif %}
+
+<!-- Charts Row -->
+<div class="profiling-form-grid mb-lg">
+  <div class="card">
+    <div class="card-header"><h3>Energy vs Accuracy</h3></div>
+    <div class="chart-container"><canvas id="scatter-chart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h3>Sensitivity Ranking</h3></div>
+    <div class="chart-container"><canvas id="sensitivity-chart"></canvas></div>
+  </div>
+</div>
+
+<div class="profiling-form-grid mb-lg">
+  <div class="card">
+    <div class="card-header"><h3>Energy Ranking</h3></div>
+    <div class="chart-container"><canvas id="energy-ranking-chart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><h3>Latency Comparison</h3></div>
+    <div class="chart-container"><canvas id="latency-chart"></canvas></div>
+  </div>
+</div>
+
+<!-- Energy Database Table -->
+{% if energy_records %}
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Energy Database E(i,b)</h3>
+    <span class="badge badge-purple">{{ energy_records | length }} records</span>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Block</th>
+          <th>Sub-layer</th>
+          <th>Bits</th>
+          <th>Latency (ms)</th>
+          <th>Power (mW)</th>
+          <th>Energy (J)</th>
+          <th>Tok/s</th>
+          <th>Temp</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in energy_records %}
+        <tr>
+          <td>{{ r.block_number }}</td>
+          <td><span class="badge badge-{% if r.sublayer == 'attention' %}info{% elif r.sublayer == 'mlp' %}success{% else %}warning{% endif %}">{{ r.sublayer }}</span></td>
+          <td>{{ r.bit_width }}</td>
+          <td class="text-mono">{{ '%.1f' % r.latency_avg_ms }}</td>
+          <td class="text-mono">{{ '%.1f' % r.avg_combined_mw }}</td>
+          <td class="text-mono">{{ '%.4f' % r.energy_joules }}</td>
+          <td class="text-mono">{{ '%.1f' % r.tokens_per_sec }}</td>
+          <td>{{ r.temperature }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Accuracy Database Table -->
+{% if accuracy_records %}
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Accuracy Database ΔA(i,b)</h3>
+    <span class="badge badge-purple">{{ accuracy_records | length }} records</span>
+  </div>
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Block</th>
+          <th>Sub-layer</th>
+          <th>Bits</th>
+          <th>Baseline PPL</th>
+          <th>Measured PPL</th>
+          <th>ΔPPL</th>
+          <th>Acc Loss</th>
+          <th>Tokens</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in accuracy_records %}
+        <tr>
+          <td>{{ r.block_number }}</td>
+          <td><span class="badge badge-{% if r.sublayer == 'attention' %}info{% elif r.sublayer == 'mlp' %}success{% else %}warning{% endif %}">{{ r.sublayer }}</span></td>
+          <td>{{ r.bit_width }}</td>
+          <td class="text-mono">{{ '%.2f' % r.baseline_perplexity }}</td>
+          <td class="text-mono">{{ '%.2f' % r.measured_perplexity }}</td>
+          <td class="text-mono {% if r.delta_perplexity > 1 %}text-error{% elif r.delta_perplexity > 0.1 %}text-warning{% else %}text-success{% endif %}">{{ '%.2f' % r.delta_perplexity }}</td>
+          <td class="text-mono">{{ '%.4f' % r.accuracy_loss }}</td>
+          <td>{{ r.num_tokens_evaluated }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Export Actions -->
+<div class="card">
+  <div class="card-header">
+    <h3>Export</h3>
+  </div>
+  <div class="action-grid">
+    <a class="action-btn" href="/api/profiling/{{ run_id }}/export?format=json" download>
+      <span class="action-icon">📄</span> JSON
+    </a>
+    <a class="action-btn" href="/api/profiling/{{ run_id }}/export?format=csv" download>
+      <span class="action-icon">📋</span> CSV
+    </a>
+    <a class="action-btn" href="/api/profiling/{{ run_id }}/export?format=markdown" download>
+      <span class="action-icon">📖</span> Markdown
+    </a>
+    <a class="action-btn" href="/api/profiling/{{ run_id }}/export?format=latex" download>
+      <span class="action-icon">📝</span> LaTeX
+    </a>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/profiling.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const energyData = {{ energy_records | tojson }};
+    const accuracyData = {{ accuracy_records | tojson }};
+    const metadata = {{ metadata | tojson }};
+
+    if (energyData.length > 0) {
+      renderEnergyHeatmap(energyData);
+      renderEnergyRanking(energyData);
+      renderLatencyChart(energyData);
+    }
+    if (accuracyData.length > 0) {
+      renderAccuracyHeatmap(accuracyData);
+      renderSensitivityChart(accuracyData);
+    }
+    if (energyData.length > 0 && accuracyData.length > 0) {
+      renderScatterChart(energyData, accuracyData);
+    }
+  });
+</script>
+{% endblock %}

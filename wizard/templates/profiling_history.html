@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Profiling History — ANE Wizard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>📁 Profiling History</h2>
+  <p>All past layer profiling experiments</p>
+</div>
+
+{% if runs %}
+<div class="card">
+  {% for run in runs %}
+  <div class="experiment-item" onclick="window.location='/profiling/results/{{ run.run_id }}'">
+    <div class="exp-name">
+      <span style="margin-right: 8px;">🧪</span>
+      {{ run.run_id }}
+      {% if run.has_energy %}
+        <span class="badge badge-info" style="margin-left: 8px;">Energy</span>
+      {% endif %}
+      {% if run.has_accuracy %}
+        <span class="badge badge-purple" style="margin-left: 4px;">Accuracy</span>
+      {% endif %}
+    </div>
+    <div class="exp-meta">
+      <div>{{ run.get('model', 'Unknown') }}</div>
+      <div>{{ run.get('timestamp', '')[:16] }}</div>
+      <div style="margin-top: 4px;">
+        {% if run.get('total_energy_records') %}
+          {{ run.total_energy_records }} energy records
+        {% endif %}
+        {% if run.get('total_accuracy_records') %}
+          · {{ run.total_accuracy_records }} accuracy records
+        {% endif %}
+      </div>
+    </div>
+    <div style="display: flex; gap: 4px; margin-left: 16px;">
+      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); deleteProfiling('{{ run.run_id }}')" title="Delete">🗑️</button>
+      <a class="btn btn-ghost btn-sm" href="/api/profiling/{{ run.run_id }}/export?format=json" download onclick="event.stopPropagation()" title="Export">💾</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <div class="empty-icon">🧪</div>
+    <p>No profiling experiments yet. Start one from the Layer Profiling page.</p>
+    <a href="/profiling" class="btn btn-primary">New Profiling Run</a>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/profiling.js"></script>
+{% endblock %}

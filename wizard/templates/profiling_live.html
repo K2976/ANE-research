@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Profiling Live — ANE Wizard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>🔬 Layer Profiling — Live</h2>
+  <p>Real-time profiling telemetry</p>
+</div>
+
+<!-- Progress Section -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Progress</h3>
+    <span class="badge badge-warning" id="prof-status-badge">Running</span>
+  </div>
+
+  <div class="progress-bar-container">
+    <div class="progress-bar" id="prof-progress-bar" style="width:0%"></div>
+  </div>
+  <div class="progress-text">
+    <span id="prof-progress-message">Initializing...</span>
+    <span id="prof-progress-pct">0%</span>
+  </div>
+
+  <!-- Current State -->
+  <div class="profiling-state-grid mt-lg">
+    <div class="state-item">
+      <div class="state-label">Current Block</div>
+      <div class="state-value" id="state-block">—</div>
+    </div>
+    <div class="state-item">
+      <div class="state-label">Sub-layer</div>
+      <div class="state-value" id="state-sublayer">—</div>
+    </div>
+    <div class="state-item">
+      <div class="state-label">Precision</div>
+      <div class="state-value" id="state-bitwidth">—</div>
+    </div>
+    <div class="state-item">
+      <div class="state-label">Phase</div>
+      <div class="state-value" id="state-phase">—</div>
+    </div>
+    <div class="state-item">
+      <div class="state-label">Elapsed</div>
+      <div class="state-value" id="state-elapsed">—</div>
+    </div>
+    <div class="state-item">
+      <div class="state-label">Remaining</div>
+      <div class="state-value" id="state-remaining">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- Live Metrics -->
+<div class="card-grid mb-lg">
+  <div class="stat-card">
+    <div class="stat-label">AVG POWER</div>
+    <div class="stat-value" id="live-power">— <small>mW</small></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">TEMPERATURE</div>
+    <div class="stat-value" id="live-temp">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">LATENCY</div>
+    <div class="stat-value" id="live-latency">— <small>ms</small></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">ENERGY</div>
+    <div class="stat-value" id="live-energy">— <small>J</small></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">TOKENS/SEC</div>
+    <div class="stat-value" id="live-tps">—</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">PERPLEXITY</div>
+    <div class="stat-value" id="live-ppl">—</div>
+  </div>
+</div>
+
+<!-- Database Counters -->
+<div class="card-grid mb-lg">
+  <div class="stat-card">
+    <div class="stat-label">ENERGY RECORDS</div>
+    <div class="stat-value" id="counter-energy">0</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">ACCURACY RECORDS</div>
+    <div class="stat-value" id="counter-accuracy">0</div>
+  </div>
+</div>
+
+<!-- Live Power Chart -->
+<div class="card mb-lg">
+  <div class="card-header">
+    <h3>Power Timeline</h3>
+  </div>
+  <div class="chart-container">
+    <canvas id="prof-live-chart"></canvas>
+  </div>
+</div>
+
+<!-- Live Console -->
+<div class="card">
+  <div class="card-header">
+    <h3>Console</h3>
+    <button class="btn btn-ghost btn-sm" onclick="clearConsole()">Clear</button>
+  </div>
+  <div class="live-console" id="prof-console"></div>
+</div>
+
+<!-- Action Buttons -->
+<div class="profiling-actions mt-lg">
+  <button class="btn btn-secondary" id="btn-live-pause" onclick="pauseProfiling()">⏸️ Pause</button>
+  <button class="btn btn-secondary hidden" id="btn-live-resume" onclick="resumeProfiling()">▶️ Resume</button>
+  <button class="btn btn-danger" id="btn-live-cancel" onclick="cancelProfiling()">✗ Cancel</button>
+</div>
+
+<!-- Post-completion (hidden initially) -->
+<div class="card mt-lg hidden" id="prof-post-actions">
+  <div class="card-header">
+    <h3>Profiling Complete</h3>
+  </div>
+  <div class="action-grid">
+    <button class="action-btn" onclick="viewResults()">
+      <span class="action-icon">📊</span> View Results
+    </button>
+    <button class="action-btn" onclick="exportResults('json')">
+      <span class="action-icon">📄</span> Export JSON
+    </button>
+    <button class="action-btn" onclick="exportResults('csv')">
+      <span class="action-icon">📋</span> Export CSV
+    </button>
+    <button class="action-btn" onclick="exportResults('latex')">
+      <span class="action-icon">📝</span> Export LaTeX
+    </button>
+    <button class="action-btn" onclick="exportResults('markdown')">
+      <span class="action-icon">📖</span> Export Markdown
+    </button>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/profiling.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    initProfilingLiveChart();
+  });
+</script>
+{% endblock %}
