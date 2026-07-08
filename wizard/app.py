@@ -29,6 +29,7 @@ from wizard.layer_profiler import LayerProfilingEngine, detect_model_structure
 from wizard.layer_db import list_profiling_runs, get_profiling_run, delete_profiling_run
 from wizard.layer_reports import export_profiling_run
 from wizard.layer_accuracy import get_available_datasets
+from wizard.cache_manager import get_cache_stats, clear_cache
 
 # ── App Setup ─────────────────────────────────────────────────────────────
 
@@ -200,6 +201,14 @@ def profiling_history_page():
     return render_template('profiling_history.html',
                            active_page='profiling_history',
                            runs=runs,
+                           loaded_model=loaded)
+
+
+@app.route('/settings')
+def settings_page():
+    loaded = ExperimentEngine.get_loaded_model()
+    return render_template('settings.html',
+                           active_page='settings',
                            loaded_model=loaded)
 
 
@@ -396,6 +405,19 @@ def api_profiling_export(run_id):
     
     return Response(content, mimetype=mimetype,
                     headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+@app.route('/api/cache/stats')
+def api_cache_stats():
+    return jsonify(get_cache_stats())
+
+
+@app.route('/api/cache/clear', methods=['POST'])
+def api_cache_clear():
+    data = request.json or {}
+    cache_type = data.get('type', 'all')
+    clear_cache(cache_type)
+    return jsonify({"success": True})
 
 
 # ── WebSocket Events ──────────────────────────────────────────────────────

@@ -1,0 +1,2 @@
+experiment_id,model,block_number,sublayer,bit_width,dataset,baseline_perplexity,measured_perplexity,delta_perplexity,baseline_accuracy,measured_accuracy,accuracy_loss,num_tokens_evaluated,timestamp
+profile_Llama-3.2-1B-Instruct_2026-07-08_13-46-04,meta-llama/Llama-3.2-1B-Instruct,0,mlp,int8,wikitext2,14.1118,14.245,0.1332,0.5036,0.506,-0.0024,836,2026-07-08T14:18:38.269392

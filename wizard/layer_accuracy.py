@@ -90,10 +90,13 @@ def compute_perplexity(model, tokenizer, texts: list, max_len: int = 512,
     correct_predictions = 0
 
     for text_idx, text in enumerate(texts):
-        try:
-            ids = tokenizer.encode(text)
-        except Exception:
-            continue
+        if isinstance(text, list):
+            ids = text
+        else:
+            try:
+                ids = tokenizer.encode(text)
+            except Exception:
+                continue
 
         if len(ids) < 2:
             continue
@@ -102,7 +105,15 @@ def compute_perplexity(model, tokenizer, texts: list, max_len: int = 512,
         if len(ids) > max_len:
             ids = ids[:max_len]
 
-        n = len(ids)
+        original_len = len(ids)
+
+        # Pad to max_len to ensure static compilation shape
+        if len(ids) < max_len:
+            pad_id = getattr(tokenizer, "pad_token_id", 0)
+            if pad_id is None: pad_id = 0
+            ids = ids + [pad_id] * (max_len - len(ids))
+
+        n = max_len
 
         try:
             # Get hidden states for all positions
@@ -113,7 +124,8 @@ def compute_perplexity(model, tokenizer, texts: list, max_len: int = 512,
             logits = hidden @ lm_head  # [n, vocab]
 
             # Cross-entropy loss: compare position i's logits against token i+1
-            for i in range(n - 1):
+            # We ONLY compute loss up to original_len - 1 to mask padded tokens
+            for i in range(original_len - 1):
                 target_id = ids[i + 1]
                 token_logits = logits[i].astype(np.float64)
 

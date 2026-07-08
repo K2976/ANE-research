@@ -8,9 +8,20 @@
 </div>
 
 <div class="card">
-  <div class="card-header">
-    <h3>Profiling Configuration</h3>
-    <span class="badge badge-purple">E(i,b) + ΔA(i,b)</span>
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <h3 style="display: inline-block; margin-right: 10px;">Profiling Configuration</h3>
+      <span class="badge badge-purple">E(i,b) + ΔA(i,b)</span>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <label style="margin:0; font-size: 0.9em; font-weight: 500;">Research Profile:</label>
+      <select class="form-select" id="prof-research-mode" onchange="applyResearchProfile()" style="width: auto; margin:0; padding: 4px 24px 4px 8px; font-size: 0.9em;">
+        <option value="quick">Quick Validation (15s, INT4)</option>
+        <option value="research">Research (30s, INT4/8)</option>
+        <option value="publication">Publication (60s, All)</option>
+        <option value="custom" selected>Custom</option>
+      </select>
+    </div>
   </div>
 
   <!-- Row 1: Model & Mode -->

@@ -56,6 +56,12 @@ function handleProfilingProgress(data) {
   if (data.energy_records !== undefined) setEl('counter-energy', data.energy_records);
   if (data.accuracy_records !== undefined) setEl('counter-accuracy', data.accuracy_records);
 
+  if (data.telemetry) {
+    setEl('telemetry-compile', data.telemetry.avg_compile + 's avg');
+    setEl('telemetry-energy', data.telemetry.avg_energy + 's avg');
+    setEl('telemetry-accuracy', data.telemetry.avg_accuracy + 's avg');
+  }
+
   addProfilingLog(data.message, 'info');
 }
 
@@ -171,6 +177,39 @@ function handleProfilingResumed() {
 }
 
 // ── Configuration Page Functions ─────────────────────────────────────────
+
+function applyResearchProfile() {
+  const mode = document.getElementById('prof-research-mode')?.value;
+  if (!mode || mode === 'custom') return;
+
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+  const setCheck = (id, check) => { const el = document.getElementById(id); if (el) el.checked = check; };
+
+  if (mode === 'quick') {
+    setVal('prof-duration', '15');
+    setVal('prof-dataset', 'wikitext2');
+    setCheck('bw-fp16', false);
+    setCheck('bw-int8', false);
+    setCheck('bw-int4', true);
+    setCheck('bw-int2', false);
+  } else if (mode === 'research') {
+    setVal('prof-duration', '30');
+    setVal('prof-dataset', 'wikitext2');
+    setCheck('bw-fp16', false);
+    setCheck('bw-int8', true);
+    setCheck('bw-int4', true);
+    setCheck('bw-int2', false);
+  } else if (mode === 'publication') {
+    setVal('prof-duration', '60');
+    setVal('prof-dataset', 'ptb');
+    setCheck('bw-fp16', true);
+    setCheck('bw-int8', true);
+    setCheck('bw-int4', true);
+    setCheck('bw-int2', true);
+  }
+  
+  updateSchedulePreview();
+}
 
 function onProfilingModeChange() {
   const mode = document.getElementById('prof-mode')?.value;

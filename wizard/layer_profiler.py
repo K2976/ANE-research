@@ -30,6 +30,7 @@ from . import models as model_mgr
 from . import metrics as metrics_mod
 from . import layer_db
 from . import layer_accuracy
+from . import cache_manager
 
 
 # ── Sub-layer Definitions ─────────────────────────────────────────────────
@@ -308,15 +309,15 @@ class LayerProfilingEngine:
             schedule = []
             if profiling_mode == "single_sublayer":
                 # Only profile the selected sub-layer type across all blocks
-                for block_idx in range(n_layers):
-                    for bw in bit_widths:
-                        schedule.append((block_idx, sublayer_filter, bw))
+                for bw in bit_widths:
+                    for block_idx in range(n_layers):
+                        schedule.append((bw, sublayer_filter, block_idx))
             else:
                 # Profile all sub-layers across all blocks
-                for block_idx in range(n_layers):
+                for bw in bit_widths:
                     for sl in SUBLAYER_TYPES:
-                        for bw in bit_widths:
-                            schedule.append((block_idx, sl, bw))
+                        for block_idx in range(n_layers):
+                            schedule.append((bw, sl, block_idx))
 
             self.total_steps = len(schedule)
 
@@ -383,12 +384,32 @@ class LayerProfilingEngine:
             eval_texts = []
             if collect_accuracy:
                 try:
-                    eval_texts = layer_accuracy.load_dataset(dataset_name)
-                    self._emit("profiling_progress", {
-                        "step": 0, "total": self.total_steps,
-                        "message": f"Loaded {len(eval_texts)} evaluation texts from {dataset_name}",
-                        "phase": "setup",
-                    })
+                    cached_tokens = cache_manager.load_tokenized_dataset(model_id, dataset_name)
+                    if cached_tokens:
+                        eval_texts = cached_tokens
+                        self._emit("profiling_progress", {
+                            "step": 0, "total": self.total_steps,
+                            "message": f"Loaded {len(eval_texts)} tokenized texts from cache",
+                            "phase": "setup",
+                        })
+                    else:
+                        raw_texts = layer_accuracy.load_dataset(dataset_name)
+                        self._emit("profiling_progress", {
+                            "step": 0, "total": self.total_steps,
+                            "message": f"Tokenizing {len(raw_texts)} evaluation texts...",
+                            "phase": "setup",
+                        })
+                        
+                        eval_texts = []
+                        for t in raw_texts:
+                            try:
+                                ids = tokenizer.encode(t)
+                                if len(ids) >= 2:
+                                    eval_texts.append(ids)
+                            except Exception:
+                                pass
+                        
+                        cache_manager.save_tokenized_dataset(model_id, dataset_name, eval_texts)
                 except Exception as e:
                     self._emit("profiling_progress", {
                         "step": 0, "total": self.total_steps,
@@ -400,27 +421,37 @@ class LayerProfilingEngine:
             # ── Compute baseline perplexity (once) ────────────────────
             baseline_metrics = None
             if collect_accuracy and eval_texts:
-                self._emit("profiling_progress", {
-                    "step": 0, "total": self.total_steps,
-                    "message": "Computing FP16 baseline perplexity...",
-                    "phase": "baseline",
-                })
-
-                # Build FP16 baseline model
-                baseline_model = LlamaPrefill(cfg, base_weights, compress=None)
-                baseline_model.warmup(max_len)
-
-                baseline_metrics = layer_accuracy.compute_perplexity(
-                    baseline_model, tokenizer, eval_texts, max_len,
-                    on_progress=lambda msg: self._emit("profiling_progress", {
+                baseline_metrics = cache_manager.load_baseline(model_id, dataset_name, max_len)
+                if baseline_metrics:
+                    self._emit("profiling_progress", {
                         "step": 0, "total": self.total_steps,
-                        "message": msg, "phase": "baseline",
+                        "message": f"Loaded cached baseline: {baseline_metrics['perplexity']:.2f}",
+                        "phase": "baseline",
                     })
-                )
+                else:
+                    self._emit("profiling_progress", {
+                        "step": 0, "total": self.total_steps,
+                        "message": "Computing FP16 baseline perplexity...",
+                        "phase": "baseline",
+                    })
 
-                # Free baseline model
-                del baseline_model
-                gc.collect()
+                    # Build FP16 baseline model
+                    baseline_model = LlamaPrefill(cfg, base_weights, compress=None)
+                    baseline_model.warmup(max_len)
+
+                    baseline_metrics = layer_accuracy.compute_perplexity(
+                        baseline_model, tokenizer, eval_texts, max_len,
+                        on_progress=lambda msg: self._emit("profiling_progress", {
+                            "step": 0, "total": self.total_steps,
+                            "message": msg, "phase": "baseline",
+                        })
+                    )
+                    
+                    cache_manager.save_baseline(model_id, dataset_name, max_len, baseline_metrics)
+
+                    # Free baseline model
+                    del baseline_model
+                    gc.collect()
 
                 self._emit("profiling_progress", {
                     "step": 0, "total": self.total_steps,
@@ -454,8 +485,13 @@ class LayerProfilingEngine:
 
             # ── Profile each combination ──────────────────────────────
             idle_baseline = config.get("idle_baseline", {"cpu_mw": 18.0, "gpu_mw": 3.4, "ane_mw": 0.0})
+            
+            # Telemetry arrays for Smart ETA
+            compile_times = []
+            energy_times = []
+            accuracy_times = []
 
-            for step_idx, (block_idx, sublayer, bit_width) in enumerate(schedule):
+            for step_idx, (bit_width, sublayer, block_idx) in enumerate(schedule):
                 if self._check_cancelled():
                     break
 
@@ -467,9 +503,16 @@ class LayerProfilingEngine:
                 self.current_bitwidth = bit_width
                 self.completed_steps = step_idx
 
-                elapsed = time.time() - self.start_time
-                avg_per_step = elapsed / max(step_idx, 1)
-                remaining = avg_per_step * (self.total_steps - step_idx)
+                avg_compile = np.mean(compile_times) if compile_times else 15.0
+                avg_energy = np.mean(energy_times) if energy_times else float(duration_sec + 5)
+                avg_acc = np.mean(accuracy_times) if accuracy_times else 5.0
+                
+                # Dynamic ETA calculation based on what is configured to run
+                eta_per_step = avg_compile
+                if collect_energy: eta_per_step += avg_energy
+                if collect_accuracy: eta_per_step += avg_acc
+                
+                remaining_sec = eta_per_step * (self.total_steps - step_idx)
 
                 self._emit("profiling_progress", {
                     "step": step_idx + 1,
@@ -479,10 +522,15 @@ class LayerProfilingEngine:
                     "block": block_idx,
                     "sublayer": sublayer,
                     "bit_width": bit_width,
-                    "elapsed_sec": round(elapsed, 1),
-                    "remaining_sec": round(remaining, 1),
+                    "elapsed_sec": round(time.time() - self.start_time, 1),
+                    "remaining_sec": round(remaining_sec, 1),
                     "energy_records": len(self.energy_records),
                     "accuracy_records": len(self.accuracy_records),
+                    "telemetry": {
+                        "avg_compile": round(avg_compile, 1),
+                        "avg_energy": round(avg_energy, 1),
+                        "avg_accuracy": round(avg_acc, 1)
+                    }
                 })
 
                 # ── Build selectively quantized model ─────────────────
@@ -506,7 +554,9 @@ class LayerProfilingEngine:
                         "block": block_idx, "sublayer": sublayer, "bit_width": bit_width,
                     })
 
+                    t_comp0 = time.time()
                     q_model.warmup(max_len)
+                    compile_times.append(time.time() - t_comp0)
                 except Exception as e:
                     self._emit("profiling_progress", {
                         "step": step_idx + 1, "total": self.total_steps,
@@ -519,11 +569,20 @@ class LayerProfilingEngine:
 
                 # ── Energy profiling ──────────────────────────────────
                 if collect_energy:
+                    self._emit("profiling_progress", {
+                        "step": step_idx + 1, "total": self.total_steps,
+                        "message": f"Measuring energy for Block {block_idx}/{sublayer}/{bit_width}...",
+                        "phase": "energy_profiling",
+                        "block": block_idx, "sublayer": sublayer, "bit_width": bit_width,
+                    })
+                    
+                    t_ene0 = time.time()
                     energy_result = self._profile_energy(
                         q_model, tokenizer, max_len,
                         duration_sec, warmup_runs, idle_baseline,
                         block_idx, sublayer, bit_width, step_idx
                     )
+                    energy_times.append(time.time() - t_ene0)
 
                     energy_record = layer_db.make_energy_record(
                         experiment_id=run_id,
@@ -551,17 +610,19 @@ class LayerProfilingEngine:
                     self._emit("profiling_progress", {
                         "step": step_idx + 1, "total": self.total_steps,
                         "message": f"Measuring accuracy for Block {block_idx}/{sublayer}/{bit_width}...",
-                        "phase": "accuracy",
+                        "phase": "accuracy_evaluation",
                         "block": block_idx, "sublayer": sublayer, "bit_width": bit_width,
                     })
 
+                    t_acc0 = time.time()
                     q_metrics = layer_accuracy.compute_perplexity(
                         q_model, tokenizer, eval_texts, max_len,
                         on_progress=lambda msg: self._emit("profiling_progress", {
                             "step": step_idx + 1, "total": self.total_steps,
-                            "message": msg, "phase": "accuracy",
+                            "message": msg, "phase": "accuracy_evaluation",
                         })
                     )
+                    accuracy_times.append(time.time() - t_acc0)
 
                     accuracy_record = layer_db.make_accuracy_record(
                         experiment_id=run_id,
