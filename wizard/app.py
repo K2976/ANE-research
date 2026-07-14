@@ -346,12 +346,22 @@ def api_profiling_start():
     config = request.json
     
     def emit_fn(event, data):
-        if event == "profiling_progress" and profiling_engine:
-            profiling_engine.last_progress_event = data
+        if profiling_engine:
+            if event == "profiling_progress":
+                profiling_engine.last_progress_event = data
+            elif event == "profiling_metric_sample":
+                profiling_engine.last_metric_sample = data
+            elif event == "profiling_sublayer_energy":
+                profiling_engine.last_energy_result = data.get("record", {})
+            elif event == "profiling_sublayer_accuracy":
+                profiling_engine.last_accuracy_result = data.get("record", {})
         socketio.emit(event, data)
         
     profiling_engine = LayerProfilingEngine(emit_fn=emit_fn)
     profiling_engine.last_progress_event = {}
+    profiling_engine.last_metric_sample = {}
+    profiling_engine.last_energy_result = {}
+    profiling_engine.last_accuracy_result = {}
     profiling_engine.start(config)
     
     return jsonify({"status": "started"})
@@ -375,12 +385,12 @@ def api_profiling_state():
     if "message" not in state_data or not state_data["message"]:
         state_data["message"] = f"Block {profiling_engine.current_block}/{profiling_engine.current_sublayer}/{profiling_engine.current_bitwidth}"
     
-    # Fill in block/sublayer/bitwidth from engine if not in last event
-    state_data.setdefault("block", profiling_engine.current_block)
-    state_data.setdefault("sublayer", profiling_engine.current_sublayer)
-    state_data.setdefault("bit_width", profiling_engine.current_bitwidth)
-    state_data.setdefault("energy_records", len(profiling_engine.energy_records))
-    state_data.setdefault("accuracy_records", len(profiling_engine.accuracy_records))
+    # Always use the LIVE engine values (not stale event data)
+    state_data["block"] = profiling_engine.current_block
+    state_data["sublayer"] = profiling_engine.current_sublayer
+    state_data["bit_width"] = profiling_engine.current_bitwidth
+    state_data["energy_records"] = len(profiling_engine.energy_records)
+    state_data["accuracy_records"] = len(profiling_engine.accuracy_records)
     
     if profiling_engine.start_time:
         elapsed = time.time() - profiling_engine.start_time
@@ -390,6 +400,19 @@ def api_profiling_state():
             avg_per_step = elapsed / profiling_engine.completed_steps
             remaining_steps = profiling_engine.total_steps - profiling_engine.completed_steps
             state_data["remaining_sec"] = round(avg_per_step * remaining_steps, 1)
+    
+    # Include last known metric sample and results for card restoration
+    last_metric = getattr(profiling_engine, 'last_metric_sample', {})
+    if last_metric:
+        state_data["last_metric"] = last_metric
+    
+    last_energy = getattr(profiling_engine, 'last_energy_result', {})
+    if last_energy:
+        state_data["last_energy"] = last_energy
+    
+    last_accuracy = getattr(profiling_engine, 'last_accuracy_result', {})
+    if last_accuracy:
+        state_data["last_accuracy"] = last_accuracy
         
     return jsonify(state_data)
 

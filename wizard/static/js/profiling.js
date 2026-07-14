@@ -690,6 +690,23 @@ function restoreProfilingState() {
         } else {
           handleProfilingResumed();
         }
+        
+        // Restore live metric cards from cached values
+        if (data.last_metric) {
+          const m = data.last_metric;
+          setEl('live-power', (m.compute_mw || 0).toFixed(1) + ' mW');
+          setEl('live-temp', m.thermal || '—');
+        }
+        if (data.last_energy) {
+          const r = data.last_energy;
+          if (r.energy_joules !== undefined) setEl('live-energy', r.energy_joules.toFixed(4) + ' J');
+          if (r.latency_avg_ms !== undefined) setEl('live-latency', r.latency_avg_ms.toFixed(1) + ' ms');
+          if (r.tokens_per_sec !== undefined) setEl('live-tps', r.tokens_per_sec.toFixed(1));
+        }
+        if (data.last_accuracy) {
+          const r = data.last_accuracy;
+          if (r.measured_perplexity !== undefined) setEl('live-ppl', r.measured_perplexity.toFixed(2));
+        }
       } else {
         // Test not running — if it was before, it finished
         // Stop polling
