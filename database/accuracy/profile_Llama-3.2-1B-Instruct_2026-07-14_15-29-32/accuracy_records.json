@@ -1,0 +1,50 @@
+[
+  {
+    "experiment_id": "profile_Llama-3.2-1B-Instruct_2026-07-14_15-29-32",
+    "model": "meta-llama/Llama-3.2-1B-Instruct",
+    "block_number": 0,
+    "sublayer": "attention",
+    "bit_width": "int8",
+    "dataset": "wikitext2",
+    "baseline_perplexity": 14.1118,
+    "measured_perplexity": 14.115,
+    "delta_perplexity": 0.0032,
+    "baseline_accuracy": 0.5036,
+    "measured_accuracy": 0.5072,
+    "accuracy_loss": -0.0036,
+    "num_tokens_evaluated": 836,
+    "timestamp": "2026-07-14T15:30:57.033091"
+  },
+  {
+    "experiment_id": "profile_Llama-3.2-1B-Instruct_2026-07-14_15-29-32",
+    "model": "meta-llama/Llama-3.2-1B-Instruct",
+    "block_number": 1,
+    "sublayer": "attention",
+    "bit_width": "int8",
+    "dataset": "wikitext2",
+    "baseline_perplexity": 14.1118,
+    "measured_perplexity": 14.0724,
+    "delta_perplexity": -0.0394,
+    "baseline_accuracy": 0.5036,
+    "measured_accuracy": 0.5084,
+    "accuracy_loss": -0.0048,
+    "num_tokens_evaluated": 836,
+    "timestamp": "2026-07-14T15:32:16.970203"
+  },
+  {
+    "experiment_id": "profile_Llama-3.2-1B-Instruct_2026-07-14_15-29-32",
+    "model": "meta-llama/Llama-3.2-1B-Instruct",
+    "block_number": 2,
+    "sublayer": "attention",
+    "bit_width": "int8",
+    "dataset": "wikitext2",
+    "baseline_perplexity": 14.1118,
+    "measured_perplexity": 14.1008,
+    "delta_perplexity": -0.011,
+    "baseline_accuracy": 0.5036,
+    "measured_accuracy": 0.506,
+    "accuracy_loss": -0.0024,
+    "num_tokens_evaluated": 836,
+    "timestamp": "2026-07-14T15:33:47.910022"
+  }
+]

@@ -35,7 +35,7 @@ function initProfilingSocket() {
   APP.socket.on('profiling_resumed', handleProfilingResumed);
 }
 
-function handleProfilingProgress(data) {
+function handleProfilingProgress(data, fromPoll) {
   const pct = data.total > 0 ? Math.round((data.step / data.total) * 100) : 0;
 
   const bar = document.getElementById('prof-progress-bar');
@@ -62,7 +62,11 @@ function handleProfilingProgress(data) {
     setEl('telemetry-accuracy', data.telemetry.avg_accuracy + 's avg');
   }
 
-  addProfilingLog(data.message, 'info');
+  // Only add console log for real websocket events, not polling updates
+  if (!fromPoll && data.message && data.message !== PROF._lastLoggedMsg) {
+    PROF._lastLoggedMsg = data.message;
+    addProfilingLog(data.message, 'info');
+  }
 }
 
 function handleProfilingMetric(data) {
@@ -309,21 +313,41 @@ function startProfiling() {
     collect_accuracy: document.getElementById('collect-accuracy')?.checked ?? true,
   };
 
-  // Navigate to live page
-  window.location.href = '/profiling/live';
-
-  // Start profiling via API
-  fetch('/api/profiling/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(config),
-  }).then(r => r.json())
-    .then(d => {
-      if (d.error) {
-        showToast(d.error, 'error');
+  // Check if a test is already running BEFORE navigating
+  fetch('/api/profiling/state')
+    .then(r => r.json())
+    .then(state => {
+      if (state.running) {
+        showToast('A profiling test is already running! Go to Live Telemetry to monitor it, or cancel it first.', 'warning');
+        return;
       }
+      // No test running — safe to start
+      fetch('/api/profiling/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      }).then(r => r.json())
+        .then(d => {
+          if (d.error) {
+            showToast(d.error, 'error');
+          } else {
+            window.location.href = '/profiling/live';
+          }
+        })
+        .catch(e => showToast('Failed to start profiling: ' + e.message, 'error'));
     })
-    .catch(e => showToast('Failed to start profiling: ' + e.message, 'error'));
+    .catch(() => {
+      // Can't reach server, try anyway
+      fetch('/api/profiling/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      }).then(r => r.json())
+        .then(d => {
+          if (d.error) showToast(d.error, 'error');
+          else window.location.href = '/profiling/live';
+        });
+    });
 }
 
 function pauseProfiling() {
@@ -651,7 +675,39 @@ function clearConsole() {
   if (console_el) console_el.innerHTML = '';
 }
 
+function restoreProfilingState() {
+  // Only poll on the live page (check for the live progress bar)
+  if (!document.getElementById('prof-progress-bar')) return;
+  
+  fetch('/api/profiling/state')
+    .then(r => r.json())
+    .then(data => {
+      if (data.running) {
+        // Update UI with the latest server-side state (fromPoll=true to skip console spam)
+        handleProfilingProgress(data, true);
+        if (data.state === 'paused') {
+          handleProfilingPaused();
+        } else {
+          handleProfilingResumed();
+        }
+      } else {
+        // Test not running — if it was before, it finished
+        // Stop polling
+        if (PROF._statePoller) {
+          clearInterval(PROF._statePoller);
+          PROF._statePoller = null;
+        }
+      }
+    })
+    .catch(() => {});
+}
+
 // ── Init ─────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initProfilingSocket();
+  // Restore state immediately and then poll every 2 seconds
+  // This ensures the live page always shows fresh data even
+  // if WebSocket events were missed during a page navigation
+  restoreProfilingState();
+  PROF._statePoller = setInterval(restoreProfilingState, 2000);
 });

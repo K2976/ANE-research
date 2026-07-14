@@ -674,10 +674,39 @@ function saveNotes(experimentId) {
     });
 }
 
+// ── Global Status Polling ────────────────────────────────────────────────
+function updateGlobalTaskIndicator() {
+  fetch('/api/status')
+    .then(r => r.json())
+    .then(status => {
+      const navItem = document.getElementById('nav-live-telemetry-item');
+      const navLink = document.getElementById('nav-live-telemetry');
+      const navText = document.getElementById('live-telemetry-text');
+      if (!navItem || !navLink || !navText) return;
+
+      if (status.profiling_running) {
+        navText.textContent = 'Profiling Active';
+        navLink.href = '/profiling/live';
+        navItem.classList.remove('hidden');
+      } else if (status.experiment_running) {
+        navText.textContent = 'Experiment Active';
+        navLink.href = '/experiment';
+        navItem.classList.remove('hidden');
+      } else {
+        navItem.classList.add('hidden');
+      }
+    })
+    .catch(() => {});
+}
+
 // ── Init ─────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initSocket();
   applyPrefs();
+
+  // Poll for global task status every 3 seconds
+  updateGlobalTaskIndicator();
+  setInterval(updateGlobalTaskIndicator, 3000);
 
   // Prompt source change listener
   const promptSource = document.getElementById('prompt-source');

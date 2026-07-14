@@ -25,7 +25,8 @@ from wizard.results import list_experiments, get_experiment, compare_experiments
 from wizard.validator import validate
 
 # Import layer profiling modules
-from wizard.layer_profiler import LayerProfilingEngine, detect_model_structure
+from wizard.layer_profiler_fixed import LayerProfilingEngine
+from wizard.layer_profiler import detect_model_structure
 from wizard.layer_db import list_profiling_runs, get_profiling_run, delete_profiling_run
 from wizard.layer_reports import export_profiling_run
 from wizard.layer_accuracy import get_available_datasets
@@ -214,6 +215,15 @@ def settings_page():
 
 # ── API Routes ────────────────────────────────────────────────────────────
 
+@app.route('/api/status')
+def api_status():
+    status = {
+        'experiment_running': engine.running if engine else False,
+        'profiling_running': profiling_engine.running if profiling_engine else False,
+    }
+    return jsonify(status)
+
+
 @app.route('/api/models')
 def api_models():
     return jsonify(get_all_models())
@@ -336,12 +346,52 @@ def api_profiling_start():
     config = request.json
     
     def emit_fn(event, data):
+        if event == "profiling_progress" and profiling_engine:
+            profiling_engine.last_progress_event = data
         socketio.emit(event, data)
         
     profiling_engine = LayerProfilingEngine(emit_fn=emit_fn)
+    profiling_engine.last_progress_event = {}
     profiling_engine.start(config)
     
     return jsonify({"status": "started"})
+
+
+@app.route('/api/profiling/state')
+def api_profiling_state():
+    import time
+    if not profiling_engine or not profiling_engine.running:
+        return jsonify({"running": False})
+        
+    # Return the exact last progress event so the UI perfectly restores
+    last_evt = getattr(profiling_engine, 'last_progress_event', {})
+    state_data = dict(last_evt) if last_evt else {}
+    state_data["running"] = True
+    state_data["state"] = profiling_engine.state
+    state_data["step"] = profiling_engine.completed_steps
+    state_data["total"] = profiling_engine.total_steps
+    
+    # Use real message from last event, fallback to a description
+    if "message" not in state_data or not state_data["message"]:
+        state_data["message"] = f"Block {profiling_engine.current_block}/{profiling_engine.current_sublayer}/{profiling_engine.current_bitwidth}"
+    
+    # Fill in block/sublayer/bitwidth from engine if not in last event
+    state_data.setdefault("block", profiling_engine.current_block)
+    state_data.setdefault("sublayer", profiling_engine.current_sublayer)
+    state_data.setdefault("bit_width", profiling_engine.current_bitwidth)
+    state_data.setdefault("energy_records", len(profiling_engine.energy_records))
+    state_data.setdefault("accuracy_records", len(profiling_engine.accuracy_records))
+    
+    if profiling_engine.start_time:
+        elapsed = time.time() - profiling_engine.start_time
+        state_data["elapsed_sec"] = round(elapsed, 1)
+        # Estimate remaining
+        if profiling_engine.completed_steps > 0 and profiling_engine.total_steps > 0:
+            avg_per_step = elapsed / profiling_engine.completed_steps
+            remaining_steps = profiling_engine.total_steps - profiling_engine.completed_steps
+            state_data["remaining_sec"] = round(avg_per_step * remaining_steps, 1)
+        
+    return jsonify(state_data)
 
 
 @app.route('/api/profiling/pause', methods=['POST'])
